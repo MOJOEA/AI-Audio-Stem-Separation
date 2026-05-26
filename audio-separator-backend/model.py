@@ -1,8 +1,9 @@
+# model.py
 import torch
 import torch.nn as nn
 
 class AudioSeparatorUNet(nn.Module):
-    def __init__(self, in_channels=1, out_channels=6):  # ปรับเพิ่มเป็น 6 เครื่องดนตรี
+    def __init__(self, in_channels=1, out_channels=6):
         super(AudioSeparatorUNet, self).__init__()
         
         # ฝั่งบีบอัดข้อมูล (Encoder)
@@ -20,7 +21,6 @@ class AudioSeparatorUNet(nn.Module):
         self.up1 = nn.ConvTranspose2d(128, 64, kernel_size=2, stride=2)
         self.dec1 = self.conv_block(128, 64)
         
-        # ชั้นสุดท้ายส่งผลลัพธ์กระจายออกเป็น 6 ชิ้นดนตรี
         self.final_layer = nn.Conv2d(64, out_channels, kernel_size=1)
         
     def conv_block(self, in_ch, out_ch):
@@ -43,7 +43,6 @@ class AudioSeparatorUNet(nn.Module):
         e4 = self.enc4(p3)
         
         d3 = self.up3(e4)
-        # ปรับขนาดภาพความถี่ให้แมตช์กันหากมีมิติเศษเกินเล็ดลอดมา
         if d3.shape != e3.shape:
             d3 = nn.functional.interpolate(d3, size=(e3.shape[2], e3.shape[3]), mode='bilinear', align_corners=False)
         d3 = torch.cat((d3, e3), dim=1)
@@ -61,4 +60,5 @@ class AudioSeparatorUNet(nn.Module):
         d1 = torch.cat((d1, e1), dim=1)
         d1 = self.dec1(d1)
         
-        return self.final_layer(d1)
+        # 🛠️ [จุดแก้สำคัญที่สุด]: แปลงผลลัพธ์ดั้งเดิมให้กลายเป็นหน้ากากกรองความถี่ (Mask) ค่าระหว่าง 0.0 - 1.0 เสมอ
+        return torch.sigmoid(self.final_layer(d1))
